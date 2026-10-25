@@ -188,3 +188,25 @@ input[type="email"]:focus-visible, input[type="password"]:focus-visible { outlin
 .sync i { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); display: inline-block; }
 .sync.wait i { background: var(--warn); }
 .sync.off i { background: var(--muted); }
+
+/* budget panel */
+.bud-figures { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.bud-cols { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 20px 28px; align-items: start; }
+.bud-side { display: grid; gap: 24px; min-width: 0; }
+.bud-main { display: grid; gap: 20px; min-width: 0; }
+.cats { list-style: none; margin: 0; padding: 0; display: grid; }
+.cat { display: grid; gap: 8px; padding: 14px 0; border-top: 1px solid var(--line); }
+.cat:first-child { border-top: 0; padding-top: 0; }
+.cat-top { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 12px; }
+.cat-top b { font-weight: 600; overflow-wrap: anywhere; }
+.cat-top .fig { font-size: 16px; }
+.cat-top .of { color: var(--muted); font-size: 13px; }
+.cat .bar .b-over { background: var(--bad); }
+.cat-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.cat-meta .spacer { flex: 1; }
+@media (max-width: 860px) {
+  .bud-cols { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 440px) {
+  .bud-figures { grid-template-columns: minmax(0, 1fr); }
+}

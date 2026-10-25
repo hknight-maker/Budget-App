@@ -143,6 +143,52 @@
       </div>
     </section>
   </div>
+
+  <section class="panel" aria-labelledby="budHead" id="budgetPanel">
+    <div class="panel-head"><h2 id="budHead">Budget</h2><span class="status" id="budMonth"></span></div>
+    <div class="figures bud-figures">
+      <div class="figure"><span class="label">Budgeted this month</span><span class="fig" id="budTotal">$0.00</span></div>
+      <div class="figure"><span class="label">Spent so far</span><span class="fig" id="budSpent">$0.00</span></div>
+      <div class="figure left"><span class="label">Left in budget</span><span class="fig" id="budLeft">$0.00</span></div>
+    </div>
+    <div class="bud-cols">
+      <div class="bud-side">
+        <form id="budForm" autocomplete="off">
+          <span class="label">Budget category</span>
+          <div class="row3">
+            <div class="field"><label for="budName">Category</label><input id="budName" type="text" placeholder="Groceries, gas, eating out" required maxlength="60"></div>
+            <div class="field"><label for="budAmount">Per month</label><input id="budAmount" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00" required></div>
+          </div>
+          <div class="actions">
+            <button class="btn primary" type="submit" id="budSubmit">Add category</button>
+            <button class="btn" type="button" id="budCancel" hidden>Cancel</button>
+          </div>
+        </form>
+        <form id="spendForm" autocomplete="off">
+          <span class="label">Add a purchase</span>
+          <div class="field"><label for="spendCat">Category</label><select id="spendCat"></select></div>
+          <div class="row2">
+            <div class="field"><label for="spendAmount">Amount</label><input id="spendAmount" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00" required></div>
+            <div class="field"><label for="spendDate">Date</label><input id="spendDate" type="date" required></div>
+          </div>
+          <div class="field"><label for="spendNote">Store or note (optional)</label><input id="spendNote" type="text" maxlength="60" placeholder="Costco, Maverik"></div>
+          <div class="actions"><button class="btn primary" type="submit">Add purchase</button></div>
+        </form>
+      </div>
+      <div class="bud-main">
+        <ul class="cats" id="budList"></ul>
+        <div class="empty" id="budEmpty" hidden>
+          <b>No budget categories yet</b>
+          <span>Add the things you spend on each month, like groceries or gas, with an amount for each. Then log purchases and watch what is left.</span>
+        </div>
+        <div id="spendBlock" hidden>
+          <span class="label">Purchases this month</span>
+          <ul class="history" id="spendList"></ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <div class="status sync" id="storeNote"><i></i><span id="storeNoteText"></span></div>
 </div>
 <div class="toast" id="toast" hidden></div>

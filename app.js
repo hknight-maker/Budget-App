@@ -9,7 +9,10 @@ const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 
 let bills = [];
 let pays = []; // the commission log: one entry per pay date
 let settings = { frequency: 'biweekly', salary: 0 };
+let budgets = []; // spending categories with a monthly amount
+let spends = []; // purchases logged against a category
 let editingId = null;
+let editingBudgetId = null;
 let pendingDelete = null;
 let pendingTimer = null;
 let store = null;
@@ -135,7 +138,64 @@ function renderBills() {
   }).join('');
 }
 
-function renderAll() { renderSummary(); renderPay(); renderBills(); }
+function renderBudget() {
+  const now = today();
+  const key = monthKey();
+  const mine = spends.filter((p) => (p.date || '').slice(0, 7) === key);
+  const spentBy = {};
+  mine.forEach((p) => { spentBy[p.categoryId] = (spentBy[p.categoryId] || 0) + p.amount; });
+  const cats = budgets.slice().sort((a, b) => a.name.localeCompare(b.name));
+  let totalB = 0, totalS = 0;
+  cats.forEach((c) => { totalB += c.amount; totalS += spentBy[c.id] || 0; });
+  const left = totalB - totalS;
+
+  $('budMonth').textContent = MONTHS[now.getMonth()] + ' ' + now.getFullYear();
+  $('budTotal').textContent = USD.format(totalB);
+  $('budSpent').textContent = USD.format(totalS);
+  const l = $('budLeft'); l.textContent = USD.format(left); l.className = 'fig ' + (totalB > 0 && left < 0 ? 'neg' : 'pos');
+
+  $('budEmpty').hidden = cats.length > 0;
+  $('budList').innerHTML = cats.map((c) => {
+    const spent = spentBy[c.id] || 0;
+    const rest = c.amount - spent;
+    const pct = c.amount > 0 ? Math.min(spent / c.amount, 1) * 100 : (spent > 0 ? 100 : 0);
+    const over = spent > c.amount;
+    const kind = over ? 'late' : (c.amount > 0 && spent >= c.amount * 0.8 ? 'soon' : '');
+    const label = over ? 'Over by ' + USD.format(spent - c.amount) : USD.format(rest) + ' left';
+    const del = pendingDelete === 'c:' + c.id;
+    return '<li class="cat">' +
+      '<div class="cat-top"><b>' + esc(c.name) + '</b><span class="fig">' + USD.format(spent) + ' <span class="of">of ' + USD.format(c.amount) + '</span></span></div>' +
+      '<div class="bar" role="img" aria-label="' + esc(c.name) + ': ' + USD.format(spent) + ' of ' + USD.format(c.amount) + '"><span class="' + (over ? 'b-over' : 'b-paid') + '" style="width:' + pct + '%"></span></div>' +
+      '<div class="cat-meta"><span class="chip ' + kind + '">' + esc(label) + '</span><span class="spacer"></span>' +
+        '<button class="btn small" data-act="edit-cat" data-id="' + esc(c.id) + '">Edit</button>' +
+        '<button class="btn small' + (del ? ' danger' : '') + '" data-act="del-cat" data-id="' + esc(c.id) + '">' + (del ? 'Confirm' : 'Delete') + '</button></div>' +
+      '</li>';
+  }).join('');
+
+  // category choices for the purchase form (keep the current choice)
+  const sel = $('spendCat');
+  const keep = sel.value;
+  sel.innerHTML = cats.length
+    ? cats.map((c) => '<option value="' + esc(c.id) + '">' + esc(c.name) + '</option>').join('')
+    : '<option value="">Add a category first</option>';
+  if (keep && cats.some((c) => c.id === keep)) sel.value = keep;
+  sel.disabled = cats.length === 0;
+
+  const names = {};
+  cats.forEach((c) => { names[c.id] = c.name; });
+  const rows = mine.filter((p) => names[p.categoryId]).sort(byDateDesc);
+  $('spendBlock').hidden = rows.length === 0;
+  $('spendList').innerHTML = rows.map((p) => {
+    const pr = p.date.split('-');
+    const dt = new Date(+pr[0], +pr[1] - 1, +pr[2]);
+    const del = pendingDelete === 's:' + p.id;
+    return '<li><span class="d">' + MONTHS[dt.getMonth()].slice(0, 3) + ' ' + dt.getDate() + ' \u00b7 ' + esc(names[p.categoryId]) + (p.note ? ' \u00b7 ' + esc(p.note) : '') + '</span>' +
+      '<span class="fig">' + USD.format(p.amount) + '</span>' +
+      '<button class="btn small' + (del ? ' danger' : '') + '" data-act="del-spend" data-id="' + esc(p.id) + '">' + (del ? 'Confirm' : 'Remove') + '</button></li>';
+  }).join('');
+}
+
+function renderAll() { renderSummary(); renderPay(); renderBills(); renderBudget(); }
 
 function renderSync(st) {
   const box = $('storeNote');
@@ -158,6 +218,12 @@ function resetBillForm() {
   $('billForm').reset();
   $('billSubmit').textContent = 'Add bill';
   $('billCancel').hidden = true;
+}
+function resetBudgetForm() {
+  editingBudgetId = null;
+  $('budForm').reset();
+  $('budSubmit').textContent = 'Add category';
+  $('budCancel').hidden = true;
 }
 function refreshDates() {
   const now = today();
@@ -241,6 +307,67 @@ function bindOnce() {
       armDelete('p:' + id);
     }
   });
+  $('budForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const name = $('budName').value.trim();
+    const amt = parseFloat($('budAmount').value);
+    if (!name || !(amt >= 0)) { toast('Enter a category name and a monthly amount.'); return; }
+    const wasEdit = !!editingBudgetId;
+    store.saveBudget(editingBudgetId, { name, amount: Math.round(amt * 100) / 100 }).then(() => toast(wasEdit ? 'Category updated' : 'Category added'), fail);
+    resetBudgetForm();
+    $('budName').focus();
+  });
+  $('budCancel').addEventListener('click', resetBudgetForm);
+  $('spendForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const cat = $('spendCat').value;
+    const amt = parseFloat($('spendAmount').value);
+    const date = $('spendDate').value;
+    if (!cat) { toast('Add a budget category first.'); return; }
+    if (!(amt > 0) || !date) { toast('Enter the purchase amount and date.'); return; }
+    store.addSpend({ categoryId: cat, amount: Math.round(amt * 100) / 100, date, note: $('spendNote').value.trim() }).then(() => toast('Purchase added'), fail);
+    $('spendAmount').value = '';
+    $('spendNote').value = '';
+    $('spendAmount').focus();
+  });
+  $('budList').addEventListener('click', (e) => {
+    const t = e.target.closest('[data-act]');
+    if (!t) return;
+    const act = t.getAttribute('data-act');
+    const id = t.getAttribute('data-id');
+    if (act === 'edit-cat') {
+      const c = budgets.find((x) => x.id === id);
+      if (!c) return;
+      editingBudgetId = id;
+      $('budName').value = c.name;
+      $('budAmount').value = c.amount;
+      $('budSubmit').textContent = 'Save changes';
+      $('budCancel').hidden = false;
+      $('budForm').scrollIntoView({ block: 'nearest' });
+      $('budName').focus();
+    } else if (act === 'del-cat') {
+      if (pendingDelete === 'c:' + id) {
+        pendingDelete = null;
+        if (editingBudgetId === id) resetBudgetForm();
+        // remove the category's purchases too, so nothing is left behind
+        spends.filter((p) => p.categoryId === id).forEach((p) => store.deleteSpend(p.id).catch(fail));
+        store.deleteBudget(id).then(() => toast('Category deleted'), fail);
+      } else {
+        armDelete('c:' + id);
+      }
+    }
+  });
+  $('spendList').addEventListener('click', (e) => {
+    const t = e.target.closest('[data-act="del-spend"]');
+    if (!t) return;
+    const id = t.getAttribute('data-id');
+    if (pendingDelete === 's:' + id) {
+      pendingDelete = null;
+      store.deleteSpend(id).then(() => toast('Purchase removed'), fail);
+    } else {
+      armDelete('s:' + id);
+    }
+  });
   // An installed app can stay open for days. Refresh the month and due dates when it comes back to the front.
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && started) { refreshDates(); renderAll(); }
@@ -252,6 +379,7 @@ export function startApp(s, opts = {}) {
   store = s;
   refreshDates();
   $('payDate').value = isoDate(today());
+  $('spendDate').value = isoDate(today());
   $('whoEmail').textContent = opts.email || '';
   $('signOut').onclick = () => opts.onSignOut && opts.onSignOut();
   if (!started) { bindOnce(); started = true; }
@@ -262,6 +390,8 @@ export function startApp(s, opts = {}) {
   s.onStatus && s.onStatus(renderSync);
   s.onBills((x) => { bills = x; renderAll(); });
   s.onPays((x) => { pays = x; renderAll(); });
+  s.onBudgets((x) => { budgets = x; renderAll(); });
+  s.onSpends((x) => { spends = x; renderAll(); });
   s.onSettings((x) => {
     settings = { frequency: (x && x.frequency) || 'biweekly', salary: Number(x && x.salary) || 0 };
     renderAll();

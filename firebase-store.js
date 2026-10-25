@@ -4,6 +4,8 @@
 //   users/{uid}/bills/{billId}        name, amount, dueDay, category, paidMonth
 //   users/{uid}/paychecks/{id}        date (YYYY-MM-DD), commission
 //   users/{uid}/meta/settings         salary, frequency
+//   users/{uid}/budgets/{id}          name, amount (monthly spending categories)
+//   users/{uid}/spending/{id}         categoryId, amount, date (YYYY-MM-DD), note
 
 const SDK = 'https://www.gstatic.com/firebasejs/11.10.0/';
 
@@ -52,15 +54,17 @@ export async function createBackend(config) {
     const billsC = fsMod.collection(db, 'users', uid, 'bills');
     const paysC = fsMod.collection(db, 'users', uid, 'paychecks');
     const settingsD = fsMod.doc(db, 'users', uid, 'meta', 'settings');
+    const budgetsC = fsMod.collection(db, 'users', uid, 'budgets');
+    const spendC = fsMod.collection(db, 'users', uid, 'spending');
 
     let writeErr = () => {};
     let statusCb = () => {};
-    const pendingBy = { bills: false, pays: false, settings: false };
+    const pendingBy = { bills: false, pays: false, settings: false, budgets: false, spends: false };
 
     function pushStatus() {
       statusCb({
         offline: typeof navigator !== 'undefined' && navigator.onLine === false,
-        pending: pendingBy.bills || pendingBy.pays || pendingBy.settings
+        pending: Object.values(pendingBy).some(Boolean)
       });
     }
     window.addEventListener('online', pushStatus);
@@ -98,7 +102,15 @@ export async function createBackend(config) {
       deleteBill: (id) => fire(fsMod.deleteDoc(fsMod.doc(db, 'users', uid, 'bills', id))),
       addPay: (d) => fire(fsMod.addDoc(paysC, d)),
       deletePay: (id) => fire(fsMod.deleteDoc(fsMod.doc(db, 'users', uid, 'paychecks', id))),
-      saveSettings: (s) => fire(fsMod.setDoc(settingsD, s, { merge: true }))
+      saveSettings: (s) => fire(fsMod.setDoc(settingsD, s, { merge: true })),
+      onBudgets: (cb) => listen(budgetsC, 'budgets', cb, (s) => s.docs.map((d) => ({ id: d.id, ...d.data() }))),
+      onSpends: (cb) => listen(spendC, 'spends', cb, (s) => s.docs.map((d) => ({ id: d.id, ...d.data() }))),
+      saveBudget: (id, data) => fire(id
+        ? fsMod.updateDoc(fsMod.doc(db, 'users', uid, 'budgets', id), data)
+        : fsMod.addDoc(budgetsC, { createdAt: Date.now(), ...data })),
+      deleteBudget: (id) => fire(fsMod.deleteDoc(fsMod.doc(db, 'users', uid, 'budgets', id))),
+      addSpend: (d) => fire(fsMod.addDoc(spendC, d)),
+      deleteSpend: (id) => fire(fsMod.deleteDoc(fsMod.doc(db, 'users', uid, 'spending', id)))
     };
   }
 
