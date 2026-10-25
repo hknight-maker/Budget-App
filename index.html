@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Paycheck &amp; Bills</title>
+<meta name="theme-color" content="#f1f4f2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0d1412" media="(prefers-color-scheme: dark)">
+<meta name="description" content="Salary, commissions and bills in one place, synced across your devices.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Budget">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Figtree:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<main class="gate" id="screenLoading">
+  <p class="status">Loading</p>
+</main>
+
+<main class="gate" id="screenSetup" hidden>
+  <h1>One more setup step</h1>
+  <section class="panel">
+    <p>This app needs your own free Firebase project to sign in and sync. Follow SETUP.md, then paste your project settings into <code>config.js</code> and upload it again.</p>
+    <p class="msg" id="setupMsg"></p>
+  </section>
+</main>
+
+<main class="gate" id="screenAuth" hidden>
+  <h1>Paycheck &amp; Bills</h1>
+  <section class="panel" aria-labelledby="authHead">
+    <h2 id="authHead">Sign in</h2>
+    <p>Use the same email and password on every device and your budget stays in sync.</p>
+    <form id="authForm" autocomplete="on" novalidate>
+      <div class="field"><label for="authEmail">Email</label><input id="authEmail" type="email" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" required></div>
+      <div class="field"><label for="authPass">Password</label><input id="authPass" type="password" autocomplete="current-password" minlength="6" required></div>
+      <div class="actions">
+        <button class="btn primary" type="submit" id="signInBtn">Sign in</button>
+        <button class="btn" type="button" id="signUpBtn">Create account</button>
+      </div>
+      <button class="linklike" type="button" id="resetBtn">Forgot password?</button>
+    </form>
+    <p class="msg" id="authMsg" role="alert"></p>
+  </section>
+</main>
+
+<div class="wrap" id="screenApp" hidden>
+  <header>
+    <div>
+      <h1>Paycheck &amp; Bills</h1>
+      <div class="month" id="monthLabel"></div>
+    </div>
+    <div class="who"><span class="status" id="whoEmail"></span><button class="btn small" type="button" id="signOut">Sign out</button></div>
+  </header>
+
+  <section class="summary" aria-labelledby="dashHead">
+    <div class="panel-head"><h2 id="dashHead">Dashboard</h2></div>
+    <div class="figures">
+      <div class="figure"><span class="label">Fixed monthly income</span><span class="fig" id="sumIncome">$0.00</span><span class="note" id="sumIncomeNote"></span></div>
+      <div class="figure"><span class="label">Commissions this month</span><span class="fig" id="sumComm">$0.00</span><span class="note" id="sumCommNote"></span></div>
+      <div class="figure"><span class="label">All bills</span><span class="fig" id="sumBills">$0.00</span><span class="note" id="sumBillsNote"></span></div>
+      <div class="figure"><span class="label">Still to pay</span><span class="fig" id="sumOwed">$0.00</span></div>
+      <div class="figure left"><span class="label">Left after bills</span><span class="fig" id="sumLeft">$0.00</span><span class="note">Salary only</span></div>
+      <div class="figure left"><span class="label">Left with commissions</span><span class="fig" id="sumLeftComm">$0.00</span><span class="note">Salary plus commissions logged this month</span></div>
+    </div>
+    <div id="barBlock" hidden>
+      <div class="bar" role="img" id="bar"><span class="b-paid" id="barPaid"></span><span class="b-owed" id="barOwed"></span></div>
+      <div class="bar-key" style="margin-top:8px">
+        <span><i style="background:var(--accent)"></i>Paid this month</span>
+        <span><i style="background:var(--warn)"></i>Still to pay</span>
+        <span><i style="background:var(--line)"></i>Left over</span>
+      </div>
+    </div>
+  </section>
+
+  <div class="cols">
+    <section class="panel" aria-labelledby="payHead">
+      <div class="panel-head"><h2 id="payHead">Paycheck</h2></div>
+      <div class="latest" id="latest" hidden>
+        <span class="label">Salary per paycheck</span>
+        <span class="fig" id="latestAmt"></span>
+        <span class="sub" id="latestSub"></span>
+      </div>
+      <form id="payForm" autocomplete="off">
+        <div class="field"><label for="payAmount">Paycheck</label><input id="payAmount" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00" required></div>
+        <div class="field">
+          <label for="payFreq">How often you are paid</label>
+          <select id="payFreq">
+            <option value="weekly">Every week</option>
+            <option value="biweekly" selected>Every two weeks</option>
+            <option value="semimonthly">Twice a month</option>
+            <option value="monthly">Once a month</option>
+          </select>
+        </div>
+        <div class="actions"><button class="btn primary" type="submit">Save paycheck</button></div>
+      </form>
+      <form id="commForm" autocomplete="off">
+        <span class="label">Commission for a pay period</span>
+        <div class="row2">
+          <div class="field"><label for="payCommission">Commission</label><input id="payCommission" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00" required></div>
+          <div class="field"><label for="payDate">Pay date</label><input id="payDate" type="date" required></div>
+        </div>
+        <div class="actions"><button class="btn primary" type="submit">Add commission</button></div>
+      </form>
+      <div id="historyBlock" hidden>
+        <span class="label">Commission history</span>
+        <ul class="history" id="history"></ul>
+      </div>
+    </section>
+
+    <section class="panel" aria-labelledby="billHead">
+      <div class="panel-head"><h2 id="billHead">Bills</h2><span class="status" id="billCount"></span></div>
+      <form id="billForm" autocomplete="off">
+        <div class="row3">
+          <div class="field"><label for="billName">Bill name</label><input id="billName" type="text" placeholder="Rent, electric, phone" required maxlength="80"></div>
+          <div class="field"><label for="billAmount">Amount</label><input id="billAmount" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00" required></div>
+        </div>
+        <div class="row2">
+          <div class="field"><label for="billDay">Due day of month</label><input id="billDay" type="number" inputmode="numeric" min="1" max="31" step="1" placeholder="1 to 31" required></div>
+          <div class="field">
+            <label for="billCat">Category</label>
+            <select id="billCat">
+              <option>Housing</option><option>Utilities</option><option>Insurance</option><option>Debt</option>
+              <option>Subscriptions</option><option>Transport</option><option>Food</option><option>Other</option>
+            </select>
+          </div>
+        </div>
+        <div class="actions">
+          <button class="btn primary" type="submit" id="billSubmit">Add bill</button>
+          <button class="btn" type="button" id="billCancel" hidden>Cancel</button>
+        </div>
+      </form>
+      <ul class="bills" id="bills"></ul>
+      <div class="empty" id="billsEmpty" hidden>
+        <b>No bills yet</b>
+        <span>Add each recurring bill with its amount and due day. Your totals and due dates fill in above.</span>
+      </div>
+    </section>
+  </div>
+  <div class="status sync" id="storeNote"><i></i><span id="storeNoteText"></span></div>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script src="config.js"></script>
+<script type="module" src="main.js"></script>
+</body>
+</html>
