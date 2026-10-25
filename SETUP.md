@@ -10,8 +10,8 @@ Plan on about 20 minutes. You only do this once. No credit card is needed for ei
 ## Part 1: Firebase (your data and sign-in)
 
 1. Go to https://console.firebase.google.com and sign in with a Google account. Choose **Create a project**, name it (for example `my-budget`), and turn **off** Google Analytics. Choose **Create project**.
-2. In the left menu open **Build**, then **Authentication**. Choose **Get started**, open the **Sign-in method** tab, choose **Email/Password**, switch on the first toggle (Email/Password), and **Save**.
-3. In the left menu open **Build**, then **Firestore Database**. Choose **Create database**. Pick any United States location (this cannot be changed later). Choose **Start in production mode**, then **Create**.
+2. In the left menu open **Security**, then **Authentication** (menu names change now and then; the search box at the top of the Firebase console also finds them). Choose **Get started**, open the **Sign-in method** tab, choose **Email/Password**, switch on the first toggle (Email/Password), and **Save**.
+3. In the left menu open **Databases & Storage**, then **Firestore**. Choose **Create database**. Pick any United States location (this cannot be changed later). Choose **Start in production mode**, then **Create**.
 4. Still in Firestore Database, open the **Rules** tab. Delete everything in the box, paste the contents of the file `firestore.rules` from this folder, and choose **Publish**. These rules let each signed-in person see only their own data.
 5. Click the gear icon next to **Project Overview**, then **Project settings**. On the **General** tab scroll to **Your apps** and choose the web icon `</>`. Give it any nickname, leave Firebase Hosting unchecked, and choose **Register app**. Firebase shows a block of code with a `firebaseConfig` section.
 6. Open `site/config.js` in any text editor (Notepad works). Replace each `PASTE_...` value with the matching value from `firebaseConfig`: `apiKey`, `authDomain`, `projectId`, `storageBucket`, `messagingSenderId`, `appId`. Keep the quotation marks and commas. Save the file.
