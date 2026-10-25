@@ -1,11 +1,10 @@
-// Your Firebase project settings. Replace each PASTE_... value with the matching value
-// from Firebase (SETUP.md, step 5). Keep the quotation marks and commas.
+// Your Firebase project settings.
 // These values are not passwords. Your data is protected by your sign-in and the rules in SETUP.md.
 window.BUDGET_FIREBASE_CONFIG = {
-  apiKey: "PASTE_API_KEY",
-  authDomain: "PASTE_PROJECT_ID.firebaseapp.com",
-  projectId: "PASTE_PROJECT_ID",
-  storageBucket: "PASTE_PROJECT_ID.firebasestorage.app",
-  messagingSenderId: "PASTE_SENDER_ID",
-  appId: "PASTE_APP_ID"
+  apiKey: "AIzaSyAa83_rOh3O3Dd2tR2iul8rD0WhZi68qM0",
+  authDomain: "budget-app-3eb75.firebaseapp.com",
+  projectId: "budget-app-3eb75",
+  storageBucket: "budget-app-3eb75.firebasestorage.app",
+  messagingSenderId: "417189687617",
+  appId: "1:417189687617:web:e0097aa7213ea1e5d7b1c0"
 };
