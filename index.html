@@ -67,7 +67,7 @@
       <div class="figure"><span class="label">All bills</span><span class="fig" id="sumBills">$0.00</span><span class="note" id="sumBillsNote"></span></div>
       <div class="figure"><span class="label">Still to pay</span><span class="fig" id="sumOwed">$0.00</span></div>
       <div class="figure left"><span class="label">Left after bills</span><span class="fig" id="sumLeft">$0.00</span><span class="note">Salary only</span></div>
-      <div class="figure left"><span class="label">Left with commissions</span><span class="fig" id="sumLeftComm">$0.00</span><span class="note">Salary plus commissions logged this month</span></div>
+      <div class="figure left"><span class="label">Left with commissions</span><span class="fig" id="sumLeftComm">$0.00</span><span class="note">Salary plus commissions this month, logged or expected</span></div>
     </div>
     <div id="barBlock" hidden>
       <div class="bar" role="img" id="bar"><span class="b-paid" id="barPaid"></span><span class="b-owed" id="barOwed"></span></div>
@@ -87,8 +87,28 @@
         <span class="fig" id="latestAmt"></span>
         <span class="sub" id="latestSub"></span>
       </div>
+      <div class="nextblock">
+        <span class="label">Next payday forecast</span>
+        <form id="nextForm" autocomplete="off">
+          <div class="row2">
+            <div class="field"><label for="nextComm">Expected commission (before tax)</label><input id="nextComm" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00" required></div>
+            <div class="field"><label for="nextDate">Pay date</label><input id="nextDate" type="date" required></div>
+          </div>
+          <div class="field"><label for="commTax">Percent taken from commission</label><input id="commTax" type="number" inputmode="decimal" min="0" max="99" step="0.01" value="36.07" required></div>
+          <div class="actions"><button class="btn primary" type="submit">Show forecast</button><button class="btn" type="button" id="nextClear" hidden>Clear</button></div>
+        </form>
+        <div class="forecast" id="forecast" hidden>
+          <span class="label">Expected deposit</span>
+          <span class="fig" id="fcTotal"></span>
+          <ul class="fclines" id="fcLines"></ul>
+          <form id="actualForm" autocomplete="off">
+            <div class="field"><label for="actualDep">After payday: what actually hit your account</label><input id="actualDep" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00" required></div>
+            <div class="actions"><button class="btn primary" type="submit">Log this paycheck</button></div>
+          </form>
+        </div>
+      </div>
       <form id="payForm" autocomplete="off">
-        <div class="field"><label for="payAmount">Paycheck</label><input id="payAmount" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00" required></div>
+        <div class="field"><label for="payAmount">Paycheck (the amount deposited, salary only)</label><input id="payAmount" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00" required></div>
         <div class="field">
           <label for="payFreq">How often you are paid</label>
           <select id="payFreq">
@@ -101,16 +121,22 @@
         <div class="actions"><button class="btn primary" type="submit">Save paycheck</button></div>
       </form>
       <form id="commForm" autocomplete="off">
-        <span class="label">Commission for a pay period</span>
+        <span class="label">Commission received (before tax)</span>
         <div class="row2">
-          <div class="field"><label for="payCommission">Commission</label><input id="payCommission" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00" required></div>
+          <div class="field"><label for="payCommission">Commission before tax</label><input id="payCommission" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00" required></div>
           <div class="field"><label for="payDate">Pay date</label><input id="payDate" type="date" required></div>
         </div>
         <div class="actions"><button class="btn primary" type="submit">Add commission</button></div>
       </form>
+      <div class="hist2">
       <div id="historyBlock" hidden>
         <span class="label">Commission history</span>
         <ul class="history" id="history"></ul>
+      </div>
+      <div id="checkBlock" hidden>
+        <span class="label">Paycheck history</span>
+        <ul class="history" id="checkList"></ul>
+      </div>
       </div>
     </section>
 

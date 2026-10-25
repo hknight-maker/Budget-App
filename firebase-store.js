@@ -2,7 +2,8 @@
 // The Firebase files load straight from Google's CDN in the browser, so there is nothing to install or build.
 // Data layout, all private to the signed-in user:
 //   users/{uid}/bills/{billId}        name, amount, dueDay, category, paidMonth
-//   users/{uid}/paychecks/{id}        date (YYYY-MM-DD), commission
+//   users/{uid}/paychecks/{id}        date (YYYY-MM-DD), commission (before tax), net (after tax)
+//   users/{uid}/checks/{id}           date, forecast, actual, commission, net, implied (logged paychecks)
 //   users/{uid}/meta/settings         salary, frequency
 //   users/{uid}/budgets/{id}          name, amount (monthly spending categories)
 //   users/{uid}/spending/{id}         categoryId, amount, date (YYYY-MM-DD), note
@@ -56,10 +57,11 @@ export async function createBackend(config) {
     const settingsD = fsMod.doc(db, 'users', uid, 'meta', 'settings');
     const budgetsC = fsMod.collection(db, 'users', uid, 'budgets');
     const spendC = fsMod.collection(db, 'users', uid, 'spending');
+    const checksC = fsMod.collection(db, 'users', uid, 'checks');
 
     let writeErr = () => {};
     let statusCb = () => {};
-    const pendingBy = { bills: false, pays: false, settings: false, budgets: false, spends: false };
+    const pendingBy = { bills: false, pays: false, settings: false, budgets: false, spends: false, checks: false };
 
     function pushStatus() {
       statusCb({
@@ -109,6 +111,9 @@ export async function createBackend(config) {
         ? fsMod.updateDoc(fsMod.doc(db, 'users', uid, 'budgets', id), data)
         : fsMod.addDoc(budgetsC, { createdAt: Date.now(), ...data })),
       deleteBudget: (id) => fire(fsMod.deleteDoc(fsMod.doc(db, 'users', uid, 'budgets', id))),
+      onChecks: (cb) => listen(checksC, 'checks', cb, (s) => s.docs.map((d) => ({ id: d.id, ...d.data() }))),
+      addCheck: (d) => fire(fsMod.addDoc(checksC, d)),
+      deleteCheck: (id) => fire(fsMod.deleteDoc(fsMod.doc(db, 'users', uid, 'checks', id))),
       addSpend: (d) => fire(fsMod.addDoc(spendC, d)),
       deleteSpend: (id) => fire(fsMod.deleteDoc(fsMod.doc(db, 'users', uid, 'spending', id)))
     };

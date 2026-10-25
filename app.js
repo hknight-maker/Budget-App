@@ -8,7 +8,9 @@ const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 
 
 let bills = [];
 let pays = []; // the commission log: one entry per pay date
-let settings = { frequency: 'biweekly', salary: 0 };
+const DEFAULT_TAX = 36.07; // percent taken from a commission (worked out from two real paystubs)
+let settings = { frequency: 'biweekly', salary: 0, commTax: DEFAULT_TAX, nextComm: 0, nextDate: '' };
+let checks = []; // logged paychecks: forecast versus what really hit the account
 let budgets = []; // spending categories with a monthly amount
 let spends = []; // purchases logged against a category
 let editingId = null;
@@ -42,6 +44,15 @@ function fail(e) {
 /* ---------- calculations ---------- */
 const byDateDesc = (a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0);
 const commEntries = () => pays.filter((p) => typeof p.commission === 'number');
+// A commission entry holds the amount before tax. Its after-tax amount is saved with it when it is logged.
+const entryNet = (p) => (typeof p.net === 'number' ? p.net : round2(p.commission * (1 - taxPct() / 100)));
+
+const round2 = (n) => Math.round(n * 100) / 100;
+const taxPct = () => (settings.commTax >= 0 && settings.commTax < 100 ? settings.commTax : DEFAULT_TAX);
+const expectedGross = () => (settings.nextComm > 0 && settings.nextDate ? settings.nextComm : 0);
+const expectedNet = () => round2(expectedGross() * (1 - taxPct() / 100)); // commission after tax
+const forecastDeposit = () => round2((settings.salary > 0 ? settings.salary : 0) + expectedNet());
+const shortDate = (iso) => { const p = iso.split('-'); return MONTHS[+p[1] - 1].slice(0, 3) + ' ' + +p[2]; };
 
 function dueInfo(b) {
   const now = today();
@@ -62,9 +73,10 @@ function renderSummary() {
   const income = sal * PERIODS[freq];
   const key = monthKey();
   const cs = commEntries();
-  const commMonth = cs.filter((p) => p.date.slice(0, 7) === key).reduce((t, p) => t + p.commission, 0);
+  const expNet = expectedGross() && settings.nextDate.slice(0, 7) === key ? expectedNet() : 0;
+  const commMonth = cs.filter((p) => p.date.slice(0, 7) === key).reduce((t, p) => t + entryNet(p), 0) + expNet;
   const recent = cs.slice().sort(byDateDesc).slice(0, 6);
-  const avg = recent.length ? recent.reduce((t, p) => t + p.commission, 0) / recent.length : 0;
+  const avg = recent.length ? recent.reduce((t, p) => t + entryNet(p), 0) / recent.length : 0;
   let total = 0, paid = 0;
   bills.forEach((b) => { total += b.amount; if (b.paidMonth === key) paid += b.amount; });
   const owed = total - paid;
@@ -74,7 +86,8 @@ function renderSummary() {
   $('sumIncome').textContent = USD.format(income);
   $('sumIncomeNote').textContent = sal > 0 ? 'Salary only, ' + USD.format(sal) + ' per paycheck' : 'Enter your paycheck below';
   $('sumComm').textContent = USD.format(commMonth);
-  $('sumCommNote').textContent = recent.length ? 'Average ' + USD.format(avg) + ' per pay period' : 'Add each pay period below';
+  $('sumCommNote').textContent = expNet ? 'Includes ' + USD.format(expNet) + ' expected ' + shortDate(settings.nextDate) + ', after tax'
+    : recent.length ? 'After tax. Average ' + USD.format(avg) + ' per pay period' : 'After tax. Add each pay period below';
   $('sumBills').textContent = USD.format(total);
   $('sumOwed').textContent = USD.format(owed);
   const l = $('sumLeft'); l.textContent = USD.format(left); l.className = 'fig ' + (left < 0 ? 'neg' : 'pos');
@@ -111,8 +124,42 @@ function renderPay() {
     const dt = new Date(+pr[0], +pr[1] - 1, +pr[2]);
     const del = pendingDelete === 'p:' + p.id;
     return '<li><span class="d">' + MONTHS[dt.getMonth()].slice(0, 3) + ' ' + dt.getDate() + ', ' + dt.getFullYear() + '</span>' +
-      '<span class="fig">' + USD.format(p.commission) + '</span>' +
+      '<span class="fig">' + USD.format(p.commission) + '<small>After tax ' + USD.format(entryNet(p)) + '</small></span>' +
       '<button class="btn small' + (del ? ' danger' : '') + '" data-act="del-pay" data-id="' + esc(p.id) + '">' + (del ? 'Confirm' : 'Remove') + '</button></li>';
+  }).join('');
+}
+
+function renderNext() {
+  const active = document.activeElement;
+  const g = expectedGross();
+  if (active !== $('nextComm') && !$('nextComm').value && g) $('nextComm').value = settings.nextComm;
+  if (active !== $('nextDate') && settings.nextDate) $('nextDate').value = settings.nextDate;
+  if (active !== $('commTax')) $('commTax').value = taxPct();
+  $('nextClear').hidden = !g;
+  const show = g > 0 && settings.salary > 0;
+  $('forecast').hidden = !show;
+  if (show) {
+    const net = expectedNet();
+    $('fcTotal').textContent = USD.format(forecastDeposit());
+    $('fcLines').innerHTML =
+      '<li><span>Paycheck (salary only)</span><span class="fig">' + USD.format(settings.salary) + '</span></li>' +
+      '<li><span>Commission before tax</span><span class="fig">' + USD.format(g) + '</span></li>' +
+      '<li><span>Tax at ' + taxPct() + '%</span><span class="fig">-' + USD.format(round2(g - net)) + '</span></li>' +
+      '<li><span>Commission after tax</span><span class="fig">' + USD.format(net) + '</span></li>';
+  }
+}
+
+function renderChecks() {
+  const sorted = checks.slice().sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+  $('checkBlock').hidden = sorted.length === 0;
+  $('checkList').innerHTML = sorted.map((c) => {
+    const pr = c.date.split('-');
+    const off = round2(c.actual - c.forecast);
+    const del = pendingDelete === 'k:' + c.id;
+    return '<li><span class="d">' + MONTHS[+pr[1] - 1].slice(0, 3) + ' ' + +pr[2] + ', ' + pr[0] +
+      '<small>Forecast ' + USD.format(c.forecast) + ' · Off by ' + (off === 0 ? '$0.00' : (off > 0 ? '+' : '-') + USD.format(Math.abs(off))) + '</small></span>' +
+      '<span class="fig">' + USD.format(c.actual) + '</span>' +
+      '<button class="btn small' + (del ? ' danger' : '') + '" data-act="del-check" data-id="' + esc(c.id) + '">' + (del ? 'Confirm' : 'Remove') + '</button></li>';
   }).join('');
 }
 
@@ -195,7 +242,7 @@ function renderBudget() {
   }).join('');
 }
 
-function renderAll() { renderSummary(); renderPay(); renderBills(); renderBudget(); }
+function renderAll() { renderSummary(); renderPay(); renderNext(); renderChecks(); renderBills(); renderBudget(); }
 
 function renderSync(st) {
   const box = $('storeNote');
@@ -256,9 +303,44 @@ function bindOnce() {
     const c = parseFloat($('payCommission').value);
     const date = $('payDate').value;
     if (!(c >= 0) || !date) { toast('Enter the commission amount and the pay date.'); return; }
-    store.addPay({ date, commission: Math.round(c * 100) / 100 }).then(() => toast('Commission added'), fail);
+    store.addPay({ date, commission: round2(c), net: round2(c * (1 - taxPct() / 100)) }).then(() => toast('Commission added'), fail);
     $('payCommission').value = '';
     $('payCommission').focus();
+  });
+  $('nextForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const c = parseFloat($('nextComm').value);
+    const date = $('nextDate').value;
+    const pct = parseFloat($('commTax').value);
+    if (!(c > 0) || !date) { toast('Enter the expected commission and the pay date.'); return; }
+    if (!(pct >= 0 && pct < 100)) { toast('Enter the percent taken from commission, from 0 to 99.'); return; }
+    if (!(settings.salary > 0)) toast('Forecast saved. Enter your paycheck below to see the total deposit.');
+    store.saveSettings({ nextComm: round2(c), nextDate: date, commTax: round2(pct) }).then(() => settings.salary > 0 && toast('Forecast saved'), fail);
+  });
+  $('nextClear').addEventListener('click', () => {
+    $('nextComm').value = '';
+    store.saveSettings({ nextComm: 0, nextDate: '' }).then(() => toast('Forecast cleared'), fail);
+  });
+  $('actualForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const a = parseFloat($('actualDep').value);
+    if (!(a > 0)) { toast('Enter the amount that hit your account.'); return; }
+    const g = expectedGross();
+    if (!g || !(settings.salary > 0)) return;
+    const forecast = forecastDeposit();
+    const net = Math.max(0, round2(a - settings.salary));
+    const implied = round2((1 - net / g) * 100);
+    const date = settings.nextDate || isoDate(today());
+    Promise.all([
+      store.addPay({ date, commission: g, net }),
+      store.addCheck({ date, forecast, actual: round2(a), commission: g, net, implied }),
+      store.saveSettings({ nextComm: 0, nextDate: '' })
+    ]).then(() => {
+      const off = round2(a - forecast);
+      toast(off === 0 ? 'Logged. The forecast was exact.' : 'Logged. The forecast was off by ' + USD.format(Math.abs(off)) + '.');
+    }, fail);
+    $('actualDep').value = '';
+    $('nextComm').value = '';
   });
   $('payFreq').addEventListener('change', () => {
     store.saveSettings({ frequency: $('payFreq').value }).catch(fail);
@@ -305,6 +387,17 @@ function bindOnce() {
       store.deletePay(id).then(() => toast('Commission removed'), fail);
     } else {
       armDelete('p:' + id);
+    }
+  });
+  $('checkList').addEventListener('click', (e) => {
+    const t = e.target.closest('[data-act="del-check"]');
+    if (!t) return;
+    const id = t.getAttribute('data-id');
+    if (pendingDelete === 'k:' + id) {
+      pendingDelete = null;
+      store.deleteCheck(id).then(() => toast('Paycheck removed from history'), fail);
+    } else {
+      armDelete('k:' + id);
     }
   });
   $('budForm').addEventListener('submit', (e) => {
@@ -390,10 +483,17 @@ export function startApp(s, opts = {}) {
   s.onStatus && s.onStatus(renderSync);
   s.onBills((x) => { bills = x; renderAll(); });
   s.onPays((x) => { pays = x; renderAll(); });
+  s.onChecks((x) => { checks = x; renderAll(); });
   s.onBudgets((x) => { budgets = x; renderAll(); });
   s.onSpends((x) => { spends = x; renderAll(); });
   s.onSettings((x) => {
-    settings = { frequency: (x && x.frequency) || 'biweekly', salary: Number(x && x.salary) || 0 };
+    settings = {
+      frequency: (x && x.frequency) || 'biweekly',
+      salary: Number(x && x.salary) || 0,
+      commTax: x && typeof x.commTax === 'number' ? x.commTax : DEFAULT_TAX,
+      nextComm: Number(x && x.nextComm) || 0,
+      nextDate: (x && x.nextDate) || ''
+    };
     renderAll();
   });
 }
